@@ -9,7 +9,7 @@
         MessageTrackingLog finds message recipients and forwards them to Search-Mailbox that performs the necessary 
         actions in the mailboxes
 
-        This only Line, that you should correct:
+        This only Line, that you should to correct:
         $exch= (Get-ADComputer -Filter "name -like 's-ex-0*'").name| Get-Random
  
     .PARAMETER 'MessageSubject', 'Start', 'EventId', 'ResultSize','Sender'
