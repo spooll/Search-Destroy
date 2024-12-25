@@ -2,7 +2,7 @@ function global:Search-Destroy {
     param (
         [Parameter(Mandatory=$true)]$MessageSubject,
         $Sender,
-        $Start,
+        [string]$Start,
         $EventId="deliver",
         $ResultSize="unlimited",
         $TargetMailbox,
@@ -13,16 +13,28 @@ function global:Search-Destroy {
         [switch]$LogOnly,
         [switch]$Force
     )
+    $ErrorActionPreference="stop"
     while (-Not(Get-PSSession|Where-Object ConfigurationName -eq "Microsoft.Exchange")) {
-        $exch= (Get-ADComputer -Filter "name -like 's-ex-0*'").name| Get-Random  #Here you need to correct the names of mail servers to suit your template
+        $exch= (Get-ADComputer -Filter "name -like 's-ex-0*'").name| Get-Random
         $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "http://$exch/Powershell" -Authentication Kerberos
         Import-PSSession $session -DisableNameChecking -AllowClobber | out-null
-        Write-Host Exchange PSSession loaded successfully! -ForegroundColor magenta
     }
 
+    if($Start){
+        try{
+            $MyDate=$Start #[datetime]::parseexact($start,'MM.dd.yyyy', $null).ToString('dd/MM/yyyy')
+        }
+        catch {
+            Write-Host "Provide $Start Date as MM.dd.yyyy" -ForegroundColor Red
+            break
+        }
+        #$Date=[DateTime]::ParseExact($start, "MM/dd/yyyy", $null)
+        #$MyDate=$Date.ToString("dd\/MM\/yyyy")
+    }
+    
     $Track =@{}
     $Search=@{}
-    'MessageSubject', 'Start', 'EventId', 'ResultSize','Sender' |Foreach{ 
+    'MessageSubject', 'Start', 'EventId', 'ResultSize','Sender' |Foreach { 
         $value = if ($PSBoundParameters.ContainsKey($_)) { $PSBoundParameters[$_] } 
          else { Get-Variable -Scope Local -ErrorAction Ignore -ValueOnly $_ }
          if($value) {$Track.Add($_, $value) }
@@ -36,16 +48,19 @@ function global:Search-Destroy {
 
     $users=(Get-TransportService).name |Get-MessageTrackingLog @Track| Select-Object -Unique -ExpandProperty Recipients
     if ($users) {
+        if ($MessageSubject -match "&|/|\|*|^|%|$|#|:|{|}"){
+            $MessageSubject=$MessageSubject -replace '[^a-zA-Z0-9\s\-]' -replace '\s+',' '
+        }
         $Query = "Subject:$MessageSubject"
         if($Sender){
             $Query += " AND from:$sender"
         }
         if($start){
-            $Query += " AND received>=$Start"
+            $Query += " AND received>=$MyDate"
         }
-            $users | foreach {Search-Mailbox $_ -SearchQuery $Query @Search -WarningAction "SilentlyContinue"} | Format-Table -AutoSize -Wrap @{n="Name";e={$_.Identity -replace '.*/'}},ResultItemsCount
+        $users | foreach {Search-Mailbox $_ -SearchQuery $Query @Search -WarningAction "SilentlyContinue"} | Format-Table -AutoSize -Wrap @{n="Name";e={$_.Identity -replace '.*/'}},ResultItemsCount
     }
     else {
-        write-host There is no result with options: @Track -BackgroundColor Red -ForegroundColor White
+        Write-Host There is no result with options:  @Track -BackgroundColor Red -ForegroundColor White
     }
 }
