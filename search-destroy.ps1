@@ -15,7 +15,7 @@ function global:Search-Destroy {
     )
     $ErrorActionPreference="stop"
     while (-Not(Get-PSSession|Where-Object ConfigurationName -eq "Microsoft.Exchange")) {
-        $exch= (Get-ADComputer -Filter "name -like 's-ex-0*'").name| Get-Random
+        $exch= (Get-ADComputer -Filter "name -like 's-ex-0*'").name| Get-Random                         #You should change this to your name template
         $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "http://$exch/Powershell" -Authentication Kerberos
         Import-PSSession $session -DisableNameChecking -AllowClobber | out-null
     }
