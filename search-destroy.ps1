@@ -1,6 +1,6 @@
 function global:Search-Destroy {
     param (
-        [Parameter(Mandatory=$true)]$MessageSubject,
+        $MessageSubject,
         $Sender,
         [string]$Start,
         $EventId="deliver",
@@ -15,7 +15,7 @@ function global:Search-Destroy {
     )
     $ErrorActionPreference="stop"
     while (-Not(Get-PSSession|Where-Object ConfigurationName -eq "Microsoft.Exchange")) {
-        $exch= (Get-ADComputer -Filter "name -like 's-ex-0*'").name| Get-Random                         #You should change this to your name template
+        $exch= (Get-ADComputer -Filter "name -like 's-ex-0*'").name| Get-Random
         $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "http://$exch/Powershell" -Authentication Kerberos
         Import-PSSession $session -DisableNameChecking -AllowClobber | out-null
     }
@@ -49,15 +49,12 @@ function global:Search-Destroy {
     $users=(Get-TransportService).name |Get-MessageTrackingLog @Track| Select-Object -Unique -ExpandProperty Recipients
     if ($users) {
         if ($MessageSubject -match "&|/|\|*|^|%|$|#|:|{|}"){
-            $MessageSubject=$MessageSubject -replace '[^a-zA-Z0-9\s\-]' -replace '\s+',' '
+            $MessageSubject=$MessageSubject -replace '[^a-zA-Z0-9\p{L}\s\-\.,:_]' -replace '\s+',' '
         }
-        $Query = "Subject:$MessageSubject"
-        if($Sender){
-            $Query += " AND from:$sender"
-        }
-        if($start){
-            $Query += " AND received>=$MyDate"
-        }
+        if($MessageSubject){$Query = "Subject:$MessageSubject"}
+        if($Sender -and $MessageSubject){$Query += " AND from:$sender"}
+        if($Sender -and !$MessageSubject){$Query += "from:$sender"}
+        if($start){$Query += " AND received>=$MyDate"}
         $users | foreach {Search-Mailbox $_ -SearchQuery $Query @Search -WarningAction "SilentlyContinue"} | Format-Table -AutoSize -Wrap @{n="Name";e={$_.Identity -replace '.*/'}},ResultItemsCount
     }
     else {
